@@ -18,6 +18,39 @@
   .loot-result { margin-top:15px; font-size:1rem; color:#0ff; min-height:24px;}
   #rules-container { display:none; background:#111; padding:12px; border:2px solid #ffcc00;
                      margin-top:15px; font-size:10px; text-align:left; line-height:1.6;}
+/* Modal base */
+.modal {
+  display: none; 
+  position: fixed; 
+  z-index: 999; 
+  left: 0; top: 0; 
+  width: 100%; height: 100%; 
+  background: rgba(0,0,0,0.8);
+  overflow: auto;
+}
+
+/* Modal content */
+.modal-content {
+  background: #111;
+  color: #fff;
+  margin: 10% auto;
+  padding: 20px;
+  border: 2px solid #ffcc00;
+  width: 80%;
+  max-width: 600px;
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: left;
+}
+
+/* Close button */
+.close {
+  color: #ffcc00;
+  float: right;
+  font-size: 20px;
+  cursor: pointer;
+}
+.close:hover { color: #ff0044; }
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
 </head>
@@ -67,6 +100,31 @@
   7️⃣ Heart regen mode after Game Over.<br>
   8️⃣ Tracks best streak and XP ever.<br>
 </div>
+
+<!-- WHY Modal -->
+<div id="why-modal" class="modal">
+  <div class="modal-content">
+    <span id="close-why" class="close">&times;</span>
+    <h2>❓ Why</h2>
+    <p>
+      We all love doing silly, guilty-pleasure things—scrolling, bingeing videos, gaming, snacking. 
+      The problem is, when we do them first, they eat up our time and leave us feeling guilty. 
+      This game flips that around.
+    </p>
+    <p>
+      Here, your guilty pleasures turn into <b>rewards</b>. Every block of focus, every bit of effort, 
+      every win you stack earns you points. Those points unlock guilt-free fun time.
+    </p>
+    <p>
+      <b>Why?</b> Because guilt kills enjoyment. If you’ve earned your break, then your “shitty” fun 
+      feels twice as good—and your productivity actually lasts longer. Think of it as hacking your brain: 
+      work fuels play, and play recharges you for more work.
+    </p>
+  </div>
+</div>
+
+<!-- Button to open WHY modal -->
+<button id="btn-toggle-why">❓ View Why</button>
 
 <!-- Button Sound Effects -->
 <audio id="snd-lose-heart" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
@@ -220,7 +278,27 @@ function toggleRules(){
   if(rc.style.display==="none"||rc.style.display===""){ rc.style.display="block"; btn.innerText="❌ Hide Rules"; }
   else { rc.style.display="none"; btn.innerText="📜 View Rules"; }
 }
+// WHY modal elements
+const whyModal = document.getElementById("why-modal");
+const whyBtn = document.getElementById("btn-toggle-why");
+const closeWhy = document.getElementById("close-why");
 
+// Show modal when clicking "View Why"
+whyBtn.onclick = () => { whyModal.style.display = "block"; };
+
+// Close when clicking ×
+closeWhy.onclick = () => { whyModal.style.display = "none"; };
+
+// Close when clicking outside modal
+window.onclick = (event) => {
+  if (event.target === whyModal) whyModal.style.display = "none";
+};
+
+// Show WHY modal only on first visit
+if (!localStorage.getItem("seenWhy")) {
+  whyModal.style.display = "block";
+  localStorage.setItem("seenWhy", "1");
+}
 // Bindings
 document.getElementById('btn-lose-heart').onclick=loseHeart;
 document.getElementById('btn-reset-hearts').onclick=resetHearts;
@@ -237,3 +315,4 @@ updateUI();
 </script>
 </body>
 </html>
+
