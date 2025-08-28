@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Always-On Day Game — Final Single Spin</title>
+<style>
+  body { font-family:'Press Start 2P', cursive; background:#000; color:#fff;
+         max-width:650px; margin:auto; padding:20px; text-align:center;}
+  h1 { color:#ffcc00; text-shadow:3px 3px #000; font-size:20px;}
+  .hearts { font-size:2rem; margin:15px 0;}
+  .xp-bar { background:#333; border:2px solid #fff; height:24px; margin-bottom:10px;}
+  .xp-fill { background:linear-gradient(90deg, #00ff00,#ffff00,#ff0000);
+             height:100%; width:0%; transition:width 0.4s;}
+  button { background:#ff0044; color:#fff; border:none; padding:10px 16px;
+           margin:5px; font-family:'Press Start 2P', cursive; cursor:pointer; font-size:11px;}
+  button:disabled { background:#555; cursor:not-allowed;}
+  button:hover:enabled { background:#ff8800;}
+  .loot-result { margin-top:15px; font-size:1rem; color:#0ff; min-height:24px;}
+  #rules-container { display:none; background:#111; padding:12px; border:2px solid #ffcc00;
+                     margin-top:15px; font-size:10px; text-align:left; line-height:1.6;}
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+</head>
+<body>
+<h1>🎮 Always-On Day Game 🎮</h1>
+
+<!-- Hearts -->
+<div class="hearts" id="hearts">❤️❤️❤️</div>
+<div>
+  <button id="btn-lose-heart">Lose Heart</button>
+  <button id="btn-reset-hearts">Reset Hearts</button>
+</div>
+
+<!-- XP -->
+<div>
+  <strong>XP:</strong> <span id="xp-count">0</span>/120
+  <div class="xp-bar"><div id="xp-bar-fill" class="xp-fill"></div></div>
+  <button id="btn-add-5xp">+5 XP</button>
+  <button id="btn-add-10xp">+10 XP</button>
+</div>
+
+<!-- Loot -->
+<div>
+  <button id="btn-roll-loot" disabled>Roll Loot</button>
+  <div id="loot-result" class="loot-result"></div>
+</div>
+
+<!-- Records -->
+<div>
+  <strong>Streak:</strong> <span id="streak-count">0</span> days<br>
+  <strong>Best Streak:</strong> <span id="best-streak">0</span> days<br>
+  <strong>Best XP:</strong> <span id="best-xp">0</span><br>
+  <button id="btn-reset-records">Reset Records</button>
+  <button id="btn-reset-xp">Reset XP</button>
+</div>
+
+<!-- Rules -->
+<button id="btn-toggle-rules">📜 View Rules</button>
+<div id="rules-container">
+  <strong>Core Rules:</strong><br><br>
+  1️⃣ Start with <b>3 Hearts</b> ❤️❤️❤️.<br>
+  2️⃣ Lose 1 heart for wasted time.<br>
+  3️⃣ Gain XP for productive blocks.<br>
+  4️⃣ XP max=120 — every +20 triggers tier reward.<br>
+  5️⃣ Lose all hearts = Game Over.<br>
+  6️⃣ Next day: XP reset & streak check (3 hearts = win day).<br>
+  7️⃣ Heart regen mode after Game Over.<br>
+  8️⃣ Tracks best streak and XP ever.<br>
+</div>
+
+<!-- Button Sound Effects -->
+<audio id="snd-lose-heart" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
+<audio id="snd-reset-heart" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"></audio>
+<audio id="snd-gain-xp" src="https://actions.google.com/sounds/v1/cartoon/clang.ogg"></audio>
+<audio id="snd-roll-loot" src="https://actions.google.com/sounds/v1/cartoon/pop.ogg"></audio>
+<audio id="snd-increase-streak" src="https://actions.google.com/sounds/v1/cartoon/pop.ogg"></audio>
+<audio id="snd-reset-streak" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"></audio>
+<audio id="snd-game-over" src="https://actions.google.com/sounds/v1/cartoon/falling_1.ogg"></audio>
+<audio id="snd-heart-regen" src="https://actions.google.com/sounds/v1/cartoon/boing.ogg"></audio>
+
+<script>
+let hearts = +localStorage.getItem('hearts') || 3;
+let xp = +localStorage.getItem('xp') || 0;
+let streak = +localStorage.getItem('streak') || 0;
+let highestStreak = +localStorage.getItem('highest_streak') || 0;
+let highestXP = +localStorage.getItem('highest_xp') || 0;
+let heartRegenMode = localStorage.getItem('regen') === '1';
+let rewardVisible = false;
+let lootUsed = {}; // 🔒 keeps track of whether loot already rolled for a tier
+
+// 🎁 Better rewards (6 tiers only)
+const rewards = {
+  1: ["15-min tea break ☕","Watch 1 fun YouTube clip 🎬","Stretch + vibe with fav song 🎶","Doodle something silly ✏️","Sit outside & breathe 🌿",
+      "Quick gaming session 🎮","Look at memes 😂","Sketch a tiny comic 🎨","Read 5 pages of a novel 📖","Sing along to 1 song 🎤"],
+  2: ["20-min hobby time (any) 🎨","Watch a short anime/cartoon ep 🍿","Play a chill mobile/PC game 🎮","Listen to a podcast 🎧","Try a new snack 🍪",
+      "Write something fun ✍️","Explore a random Wikipedia rabbit hole 🌐","Make a hot chocolate ☕","Watch highlights of fav sport ⚽","Listen to 2 songs 🎶"],
+  3: ["30-min deep hobby session 🖌️","Watch a stand-up comedy set 😂","Play a co-op/online round 🎮","Cook a fun snack 🍳","Watch 20-min documentary/TED 🎥",
+      "Practice instrument 🎸","Listen to new album 🎶","Write a short creative story ✍️","Plan a fun weekend activity 📅","Virtual hangout with a friend 💬"],
+  4: ["40-min creative flow 🎨","Watch 1 TV series episode 📺","Mini gaming session with friends 🎮","Cook or order fav food 🍜","Try a new mini-game 🎲",
+      "Photography walk 📸","Watch movie highlights 🍿","Deep dive into fav hobby 💡","Write a fun blog/journal ✍️","Learn 10 words in new language 🌍"],
+  5: ["50-min project passion work 💡","Watch half a movie 🍿","Relaxing bath/shower 🛀","Create playlist 🎶","Do a DIY mini-craft 🛠️",
+      "Online chess or strategy game ♟️","Record a fun vlog/audio 🎤","Virtual movie watch with friend 🍿","Long walk with music 🎧","Plan a dream trip ✈️"],
+  6: ["1 full movie 🍿","1-hour hobby immersion 🎨","Cook/Order a feast 🍲","Play your fav game for an hour 🎮","Deep relaxation/meditation 🧘",
+      "Read 1 hour of book 📖","Binge 2 sitcom episodes 📺","Long call with friend 💬","Spa/self-care session 🛀","Creative writing session ✍️"]
+};
+
+function getTodayDateString(){ return new Date().toISOString().split('T')[0]; }
+
+function autoDailyReset(){
+  const today = getTodayDateString();
+  const lastDate = localStorage.getItem('last_play_date');
+  if(lastDate !== today){
+    if(xp > highestXP){ highestXP = xp; }
+    if(hearts === 3){
+      streak++;
+      if(streak > highestStreak){ highestStreak = streak; }
+    } else { streak = 0; }
+    xp = 0;
+    heartRegenMode = (hearts < 3);
+    lootUsed = {}; // reset loot history for the day
+    localStorage.setItem('last_play_date', today);
+    saveState();
+  }
+}
+
+function playSound(snd){
+  snd.currentTime = 0;
+  snd.play().catch(()=>{});
+}
+
+function saveState(){
+  localStorage.setItem('hearts', hearts);
+  localStorage.setItem('xp', xp);
+  localStorage.setItem('streak', streak);
+  localStorage.setItem('highest_streak', highestStreak);
+  localStorage.setItem('highest_xp', highestXP);
+  localStorage.setItem('regen', heartRegenMode ? '1' : '0');
+}
+
+function renderHearts(){ document.getElementById('hearts').innerHTML = '❤️'.repeat(hearts) + '🤍'.repeat(3-hearts); }
+function toggleRollLootButton(){ 
+  const tier = xp/20;
+  document.getElementById('btn-roll-loot').disabled = !(xp>0 && xp%20===0 && !lootUsed[tier]); 
+}
+function hideRewardAndButton(){ document.getElementById('loot-result').innerText=""; rewardVisible=false; }
+
+function loseHeart(){
+  if(rewardVisible) hideRewardAndButton();
+  if(hearts>0){ hearts--; playSound(document.getElementById('snd-lose-heart')); }
+  if(hearts===0){ heartRegenMode=true; playSound(document.getElementById('snd-game-over'));
+    document.getElementById('loot-result').innerText="💀 GAME OVER — Earn XP for hearts!"; }
+  renderHearts(); saveState(); toggleRollLootButton(); updateUI();
+}
+
+function resetHearts(){
+  if(rewardVisible) hideRewardAndButton();
+  hearts=3; heartRegenMode=false; playSound(document.getElementById('snd-reset-heart'));
+  renderHearts(); document.getElementById('loot-result').innerText=""; saveState(); toggleRollLootButton(); updateUI();
+}
+
+function addXP(amount){
+  autoDailyReset();
+  if(rewardVisible) hideRewardAndButton();
+  if(heartRegenMode){
+    xp+=amount; playSound(document.getElementById('snd-gain-xp'));
+    if(xp>=20 && hearts<3){ hearts++; xp=0; playSound(document.getElementById('snd-heart-regen'));
+      if(hearts===3){ heartRegenMode=false; document.getElementById('loot-result').innerText="💖 Hearts restored!"; }
+    }
+  } else {
+    xp+=amount; if(xp>120) xp=120; playSound(document.getElementById('snd-gain-xp'));
+  }
+  updateUI();
+}
+
+function rollTierLoot(tier){
+  if(hearts===0) return;
+  const reward=rewards[tier][Math.floor(Math.random()*rewards[tier].length)];
+  document.getElementById('loot-result').innerText=`🎁 Tier ${tier}: ${reward}`;
+  playSound(document.getElementById('snd-roll-loot'));
+  rewardVisible=true;
+  lootUsed[tier] = true; // lock reward for this tier
+  toggleRollLootButton();
+}
+
+function rollLoot(){ if(hearts>0 && xp%20===0) rollTierLoot(xp/20); }
+
+function updateUI(){
+  document.getElementById('xp-count').innerText = xp;
+  document.getElementById('xp-bar-fill').style.width = (xp/120*100) + "%";
+  renderHearts();
+  document.getElementById('streak-count').innerText = streak;
+  document.getElementById('best-streak').innerText = highestStreak;
+  document.getElementById('best-xp').innerText = highestXP;
+  saveState(); toggleRollLootButton();
+}
+
+// New manual reset functions
+function resetRecords() {
+  streak = 0;
+  highestStreak = 0;
+  highestXP = 0;
+  saveState();
+  updateUI();
+  playSound(document.getElementById('snd-reset-streak'));
+  document.getElementById('loot-result').innerText = "🏆 Records reset!";
+}
+function resetXP() {
+  xp = 0;
+  saveState();
+  updateUI();
+  playSound(document.getElementById('snd-reset-heart'));
+  document.getElementById('loot-result').innerText = "🔁 XP reset!";
+}
+
+function increaseStreak(){ if(rewardVisible) hideRewardAndButton(); streak++; playSound(document.getElementById('snd-increase-streak')); updateUI(); }
+function resetStreak(){ if(rewardVisible) hideRewardAndButton(); streak=0; playSound(document.getElementById('snd-reset-streak')); updateUI(); }
+
+function toggleRules(){
+  const rc=document.getElementById('rules-container'); const btn=document.getElementById('btn-toggle-rules');
+  if(rc.style.display==="none"||rc.style.display===""){ rc.style.display="block"; btn.innerText="❌ Hide Rules"; }
+  else { rc.style.display="none"; btn.innerText="📜 View Rules"; }
+}
+
+// Bindings
+document.getElementById('btn-lose-heart').onclick=loseHeart;
+document.getElementById('btn-reset-hearts').onclick=resetHearts;
+document.getElementById('btn-add-5xp').onclick=()=>addXP(5);
+document.getElementById('btn-add-10xp').onclick=()=>addXP(10);
+document.getElementById('btn-roll-loot').onclick=rollLoot;
+document.getElementById('btn-toggle-rules').onclick=toggleRules;
+document.getElementById('btn-reset-records').onclick=resetRecords;
+document.getElementById('btn-reset-xp').onclick=resetXP;
+
+// Init
+autoDailyReset();
+updateUI();
+</script>
+</body>
+</html>
